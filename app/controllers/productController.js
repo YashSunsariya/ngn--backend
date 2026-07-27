@@ -1,12 +1,19 @@
 import Products from "../models/products/products.js";
 import { handleResponse } from "../utils.js/responseHandler.js";
 
+const generateSlug = (name) =>
+  name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 
 export const createProduct = async (req, res) => {
   try {
     const {
       productName,
       sku,
+      slug,
       description,
       shortDescription,
       category,
@@ -32,13 +39,6 @@ export const createProduct = async (req, res) => {
     if (existingProduct) {
       return handleResponse(res, 400, "Product with this SKU already exists");
     }
-    if (sku) {
-  const existingProduct = await Products.findOne({ sku });
-
-  if (existingProduct) {
-    return handleResponse(res, 400, "Product with this SKU already exists");
-  }
-}
 
     const images = req.files
       ? await Promise.all(
@@ -59,8 +59,11 @@ const parsedDimensions =
     ? JSON.parse(dimensions)
     : dimensions || {};
 
+const productSlug = slug || generateSlug(productName);
+
     const product = await Products.create({
       productName,
+      slug: productSlug,
       description,
       shortDescription,
       category,
@@ -151,6 +154,7 @@ export const updateProduct = async (req, res) => {
     const {
       productName,
       sku,
+      slug,
       description,
       shortDescription,
       category,
@@ -193,10 +197,13 @@ export const updateProduct = async (req, res) => {
     const parsedSpecifications = specifications ? JSON.parse(specifications) : product.specifications;
     const parsedDimensions = dimensions ? JSON.parse(dimensions) : product.dimensions;
 
+    const productSlug = slug || generateSlug(productName || product.productName);
+
     const updatedProduct = await Products.findByIdAndUpdate(
       req.params.id,
       {
         productName,
+        slug: productSlug,
         sku,
         description,
         shortDescription,
