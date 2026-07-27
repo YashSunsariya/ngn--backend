@@ -35,10 +35,11 @@ export const createProduct = async (req, res) => {
       return handleResponse(res, 400, "Missing required fields");
     }
 
-    const existingProduct = await Products.findOne({ sku });
-
-    if (existingProduct) {
-      return handleResponse(res, 400, "Product with this SKU already exists");
+    if (sku) {
+      const existingProduct = await Products.findOne({ sku });
+      if (existingProduct) {
+        return handleResponse(res, 400, "Product with this SKU already exists");
+      }
     }
 
     const images = req.files
