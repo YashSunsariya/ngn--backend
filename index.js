@@ -1,10 +1,12 @@
 import express from "express";
 import cors from "cors";
-const app = express();
 import dotenv from "dotenv";
-dotenv.config();
 import allRoutes from "./app/routes/index.js";
-import {connectDB} from "./app/config/dbConfig.js";
+import { connectDB } from "./app/config/dbConfig.js";
+
+dotenv.config();
+
+const app = express();
 
 const allowedOrigins = [
   "http://localhost:5173",
@@ -25,7 +27,20 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-await connectDB();
+let isConnected = false;
+
+app.use(async (req, res, next) => {
+  if (!isConnected) {
+    try {
+      await connectDB();
+      isConnected = true;
+    } catch (err) {
+      return res.status(500).json({ statusCode: 500, message: "Database connection failed", data: null });
+    }
+  }
+  next();
+});
+
 allRoutes(app);
 
 app.get("/", (req, res) => {
@@ -41,9 +56,4 @@ app.use((err, req, res, next) => {
   });
 });
 
-const PORT = process.env.PORT || 3000;
-const HOST= process.env.HOST || "localhost"
-
-app.listen(PORT, HOST, () => {
-  console.log(`Server is running on port http://${HOST}:${PORT} `);
-});
+export default app;
