@@ -13,7 +13,6 @@ export const createProduct = async (req, res) => {
   try {
     const {
       productName,
-      sku,
       slug,
       description,
       shortDescription,
@@ -33,13 +32,6 @@ export const createProduct = async (req, res) => {
 
     if (!productName || !category || !brand || price === undefined || stock === undefined) {
       return handleResponse(res, 400, "Missing required fields");
-    }
-
-    if (sku) {
-      const existingProduct = await Products.findOne({ sku });
-      if (existingProduct) {
-        return handleResponse(res, 400, "Product with this SKU already exists");
-      }
     }
 
     const images = req.files
@@ -150,7 +142,6 @@ export const updateProduct = async (req, res) => {
   try {
     const {
       productName,
-      sku,
       slug,
       description,
       shortDescription,
@@ -175,13 +166,6 @@ export const updateProduct = async (req, res) => {
       return handleResponse(res, 404, "Product not found");
     }
 
-    if (sku && sku !== product.sku) {
-      const existingProduct = await Products.findOne({ sku });
-      if (existingProduct) {
-        return handleResponse(res, 400, "SKU already exists");
-      }
-    }
-
     const images = req.files
       ? (await uploadMultipleImages(req.files, "products")).map((img) => img.url)
       : product.images;
@@ -196,7 +180,6 @@ export const updateProduct = async (req, res) => {
       {
         productName,
         slug: productSlug,
-        sku,
         description,
         shortDescription,
         category,
