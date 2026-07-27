@@ -1,5 +1,6 @@
 import Products from "../models/products/products.js";
 import { handleResponse } from "../utils.js/responseHandler.js";
+import { uploadSingleImageImage, uploadMultipleImages } from "../utils.js/cloudinaryUpload.js";
 
 const generateSlug = (name) =>
   name
@@ -41,12 +42,7 @@ export const createProduct = async (req, res) => {
     }
 
     const images = req.files
-      ? await Promise.all(
-          req.files.map(async (file) => {
-            const result = await uploadSingleImage(file, "products");
-            return result.url;
-          })
-        )
+      ? (await uploadMultipleImages(req.files, "products")).map((img) => img.url)
       : [];
 
 const parsedSpecifications =
@@ -186,12 +182,7 @@ export const updateProduct = async (req, res) => {
     }
 
     const images = req.files
-      ? await Promise.all(
-          req.files.map(async (file) => {
-            const result = await uploadSingleImage(file, "products");
-            return result.url;
-          })
-        )
+      ? (await uploadMultipleImages(req.files, "products")).map((img) => img.url)
       : product.images;
 
     const parsedSpecifications = specifications ? JSON.parse(specifications) : product.specifications;
