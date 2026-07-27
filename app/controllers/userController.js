@@ -94,7 +94,6 @@ export const getme = async (req, res) => {
   }
 };
 
-
 export const updateUser = async (req, res) => {
   try {
     const email = req.user.email;
@@ -103,35 +102,46 @@ export const updateUser = async (req, res) => {
 
     const updatedUser = await User.findOneAndUpdate(
       { email: email },
-      {
-        name,
-        contact,
-        address
-      },
-      {
-        new: true,
-        runValidators: true
-      }
+      { name, contact, address },
+      { new: true, runValidators: true }
     ).select("-password");
 
     if (!updatedUser) {
       return handleResponse(res, 404, "User not found");
     }
 
-    return handleResponse(
-      res,
-      200,
-      "User updated successfully",
-      updatedUser
-    );
-
+    return handleResponse(res, 200, "User updated successfully", updatedUser);
   } catch (error) {
     console.error(error);
+    return handleResponse(res, 500, "Internal server error");
+  }
+};
 
-    return handleResponse(
-      res,
-      500,
-      "Internal server error"
-    );
+export const changePassword = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return handleResponse(res, 404, "User not found");
+    }
+
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return handleResponse(res, 400, "Please provide current and new password");
+    }
+
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return handleResponse(res, 401, "Current password is incorrect");
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    return handleResponse(res, 200, "Password changed successfully");
+  } catch (error) {
+    console.error(error);
+    return handleResponse(res, 500, "Internal server error");
   }
 };

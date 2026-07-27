@@ -21,6 +21,7 @@
     "mongoose": "^9.7.4",
     "multer": "^2.2.0",
     "multer-storage-cloudinary": "^4.0.0",
+    "razorpay": "^2.9.8",
     "streamifier": "^0.1.1"
   }
 }

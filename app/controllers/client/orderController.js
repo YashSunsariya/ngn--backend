@@ -1,1029 +1,176 @@
+import Order from "./../../models/order/order.js";
+import Cart from "./../../models/cart/cart.js";
+import Address from "./../../models/address/address.js";
+import Products from "./../../models/products/products.js";
+import { handleResponse } from "../../utils.js/responseHandler.js";
+import razorpay from "./../../config/razorpay.js";
 
-
-import { responseHandler } from "../utils/responseHandler.js";
-import { getPagination } from "../utils/pagination.js";
-// import razorpay from "../configs/razorpay.js";
-import Cart from './../../models/cart/cart';
-import {orderItemSchema, orderSchema} from './../../models/order/order';
-import razorpay from './../../config/razorpay';
-
-
-// =================================================
-// GENERATE ORDER NUMBER
-// ORDER001, ORDER002, ORDER003
-// =================================================
 const generateOrderNumber = async () => {
   const lastOrder = await Order.findOne({
-    order_number: {
-      $exists: true,
-      $ne: null,
-    },
-  }).sort({
-    createdAt: -1,
-  });
+    order_number: { $exists: true, $ne: null },
+  }).sort({ createdAt: -1 });
 
   let nextNumber = 1;
-
   if (lastOrder?.order_number) {
-    const lastNumber = parseInt(
-      lastOrder.order_number
-        .replace("ORDER", ""),
-      10
-    );
-
+    const lastNumber = parseInt(lastOrder.order_number.replace("ORDER", ""), 10);
     if (!isNaN(lastNumber)) {
       nextNumber = lastNumber + 1;
     }
   }
-
   return `ORDER${String(nextNumber).padStart(3, "0")}`;
 };
 
-
-// =================================================
-// CREATE ORDER
-// =================================================
-// export const createOrder = async (req, res) => {
-//   try {
-//     const user_id = req.user._id;
-
-//     const {
-//       address_id,
-//       payment_method = "COD",
-//     } = req.body;
-
-
-//     // ---------------------------------------------
-//     // 1. CHECK ADDRESS
-//     // ---------------------------------------------
-//     const address = await Address.findOne({
-//       _id: address_id,
-//       user_id,
-//     });
-
-//     if (!address) {
-//       return responseHandler(
-//         res,
-//         404,
-//         false,
-//         "Address not found."
-//       );
-//     }
-
-
-//     // ---------------------------------------------
-//     // 2. GET CART
-//     // ---------------------------------------------
-//     const cartItems = await Cart.find({
-//       user_id,
-//     }).populate("product_id");
-
-//     if (
-//       !cartItems ||
-//       cartItems.length === 0
-//     ) {
-//       return responseHandler(
-//         res,
-//         400,
-//         false,
-//         "Cart is empty."
-//       );
-//     }
-
-
-//     // ---------------------------------------------
-//     // 3. CHECK DELETED PRODUCTS
-//     // ---------------------------------------------
-//     const invalidProduct =
-//       cartItems.find(
-//         (item) => !item.product_id
-//       );
-
-//     if (invalidProduct) {
-//       return responseHandler(
-//         res,
-//         400,
-//         false,
-//         "One or more products are no longer available."
-//       );
-//     }
-
-
-//     // ---------------------------------------------
-//     // 4. CALCULATE PRICE
-//     // ---------------------------------------------
-//     let subtotal = 0;
-
-//     cartItems.forEach((item) => {
-//       subtotal +=
-//         item.product_id.price *
-//         item.quantity;
-//     });
-
-//     const discount = 0;
-//     const delivery_charge = 40;
-//     const tax = 0;
-
-//     const total_amount =
-//       subtotal -
-//       discount +
-//       delivery_charge +
-//       tax;
-
-
-//     // =================================================
-//     // ONLINE PAYMENT - RAZORPAY
-//     // =================================================
-//     if (
-//       payment_method === "ONLINE"
-//     ) {
-//       const razorpayOrder =
-//         await razorpay.orders.create({
-
-//           amount: Math.round(
-//             total_amount * 100
-//           ),
-
-//           currency: "INR",
-
-//           receipt:
-//             `receipt_${Date.now()}`,
-
-//         });
-
-
-//       return responseHandler(
-//         res,
-//         200,
-//         true,
-//         "Razorpay order created successfully.",
-//         {
-//           razorpay_order_id:
-//             razorpayOrder.id,
-
-//           amount:
-//             razorpayOrder.amount,
-
-//           currency:
-//             razorpayOrder.currency,
-
-//           address_id,
-
-//           payment_method: "ONLINE",
-//         }
-//       );
-//     }
-
-
-//     // =================================================
-//     // GENERATE ORDER NUMBER
-//     // =================================================
-//     const order_number =
-//       await generateOrderNumber();
-
-
-//     // =================================================
-//     // CREATE COD ORDER
-//     // =================================================
-//     const order =
-//       await Order.create({
-
-//         order_number,
-
-//         user_id,
-
-//         user_details: {
-
-//           first_name:
-//             req.user.first_name,
-
-//           last_name:
-//             req.user.last_name,
-
-//           email:
-//             req.user.email,
-
-//           phone_no:
-//             req.user.phone_no,
-
-//         },
-
-
-//         address_id,
-
-
-//         address_details: {
-
-//           full_name:
-//             address.full_name,
-
-//           phone_no:
-//             address.phone_no,
-
-//           address_line:
-//             address.address_line_1,
-
-//           city:
-//             address.city,
-
-//           state:
-//             address.state,
-
-//           pincode:
-//             address.pincode,
-
-//         },
-
-
-//         finance_details: {
-
-//           subtotal,
-
-//           discount,
-
-//           delivery_charge,
-
-//           tax,
-
-//           total_amount,
-
-//         },
-
-
-//         payment_details: {
-
-//           payment_method:
-//             "COD",
-
-//           payment_status:
-//             "PENDING",
-
-//         },
-
-
-//         order_status:
-//           "PENDING",
-
-//       });
-
-
-//     // =================================================
-//     // CREATE ORDER ITEMS
-//     // =================================================
-//     const orderItems =
-//       cartItems.map((item) => {
-
-//         const product =
-//           item.product_id;
-
-//         return {
-
-//           order_id:
-//             order._id,
-
-//           product_name:
-//             product.product_name,
-
-//           price:
-//             product.price,
-
-//           quantity:
-//             item.quantity,
-
-//           total_price:
-//             product.price *
-//             item.quantity,
-
-//         };
-
-//       });
-
-
-//     // ---------------------------------------------
-//     // SAVE ORDER ITEMS
-//     // ---------------------------------------------
-//     await OrderItem.insertMany(
-//       orderItems
-//     );
-
-
-//     // ---------------------------------------------
-//     // DELETE CART
-//     // ---------------------------------------------
-//     await Cart.deleteMany({
-//       user_id,
-//     });
-
-
-//     // ---------------------------------------------
-//     // RESPONSE
-//     // ---------------------------------------------
-//     return responseHandler(
-//       res,
-//       201,
-//       true,
-//       "COD order created successfully.",
-//       {
-//         order,
-//         items:
-//           orderItems,
-//       }
-//     );
-
-
-//   } catch (error) {
-
-//     console.error(
-//       "Create Order Error:",
-//       error
-//     );
-
-//     return responseHandler(
-//       res,
-//       500,
-//       false,
-//       "Internal Server Error",
-//       error.message
-//     );
-//   }
-// };
-
-
-// =================================================
-// CREATE ORDER
-// =================================================
 export const createOrder = async (req, res) => {
   try {
     const user_id = req.user._id;
+    const { address_id, payment_method = "cod" } = req.body;
 
-    const {
-      address_id,
-      payment_method = "COD",
-    } = req.body;
-
-    // ---------------------------------------------
-    // 1. CHECK ADDRESS
-    // ---------------------------------------------
-    const address = await Address.findOne({
-      _id: address_id,
-      user_id,
-    });
-
+    const address = await Address.findOne({ _id: address_id, user: user_id });
     if (!address) {
-      return responseHandler(
-        res,
-        404,
-        false,
-        "Address not found."
-      );
+      return handleResponse(res, 404, "Address not found.");
     }
 
-    // ---------------------------------------------
-    // 2. GET CART
-    // ---------------------------------------------
-    const cartItems = await Cart.find({
-      user_id,
-    }).populate("product_id");
-
-    if (
-      !cartItems ||
-      cartItems.length === 0
-    ) {
-      return responseHandler(
-        res,
-        400,
-        false,
-        "Cart is empty."
-      );
+    const cart = await Cart.findOne({ user: user_id }).populate("items.product");
+    if (!cart || cart.items.length === 0) {
+      return handleResponse(res, 400, "Cart is empty.");
     }
 
-    // ---------------------------------------------
-    // 3. CHECK DELETED PRODUCTS
-    // ---------------------------------------------
-    const invalidProduct = cartItems.find(
-      (item) => !item.product_id
-    );
-
-    if (invalidProduct) {
-      return responseHandler(
-        res,
-        400,
-        false,
-        "One or more products are no longer available."
-      );
+    const invalidItem = cart.items.find((item) => !item.product);
+    if (invalidItem) {
+      return handleResponse(res, 400, "One or more products are no longer available.");
     }
 
-    // ---------------------------------------------
-    // 4. CALCULATE PRICE
-    // ---------------------------------------------
     let subtotal = 0;
+    const orderItems = [];
+    for (const item of cart.items) {
+      const product = item.product;
+      subtotal += product.price * item.quantity;
+      orderItems.push({
+        product: product._id,
+        productName: product.productName,
+        price: product.price,
+        quantity: item.quantity,
+      });
+    }
 
-    cartItems.forEach((item) => {
-      subtotal +=
-        item.product_id.price *
-        item.quantity;
-    });
+    const shippingCharge = 40;
+    const totalAmount = subtotal + shippingCharge;
 
-    const discount = 0;
-    const delivery_charge = 40;
-    const tax = 0;
+    const order_number = await generateOrderNumber();
 
-    const total_amount =
-      subtotal -
-      discount +
-      delivery_charge +
-      tax;
-
-    // ---------------------------------------------
-    // 5. GENERATE YOUR ORDER NUMBER
-    // ---------------------------------------------
-    const order_number =
-      await generateOrderNumber();
-
-    // =================================================
-    // 6. ONLINE PAYMENT - RAZORPAY
-    // =================================================
     let razorpay_order_id = null;
-
-    if (payment_method === "ONLINE") {
-      const razorpayOrder =
-        await razorpay.orders.create({
-          amount: Math.round(
-            total_amount * 100
-          ),
-
-          currency: "INR",
-
-          receipt: order_number,
-
-          notes: {
-            order_number,
-            user_id: user_id.toString(),
-          },
-        });
-
-      razorpay_order_id =
-        razorpayOrder.id;
+    if (payment_method === "online") {
+      const razorpayOrder = await razorpay.orders.create({
+        amount: Math.round(totalAmount * 100),
+        currency: "INR",
+        receipt: order_number,
+        notes: { order_number, user_id: user_id.toString() },
+      });
+      razorpay_order_id = razorpayOrder.id;
     }
 
-    // =================================================
-    // 7. CREATE ORDER IN YOUR DATABASE
-    // =================================================
     const order = await Order.create({
-
       order_number,
-
-      user_id,
-
-      user_details: {
-        first_name:
-          req.user.first_name,
-
-        last_name:
-          req.user.last_name,
-
-        email:
-          req.user.email,
-
-        phone_no:
-          req.user.phone_no,
+      user: user_id,
+      items: orderItems,
+      shippingAddress: {
+        fullName: address.fullName,
+        address: address.address,
+        city: address.city,
+        state: address.state,
+        pincode: address.pincode,
+        contact: address.contact,
       },
-
-      address_id,
-
-      address_details: {
-        full_name:
-          address.full_name,
-
-        phone_no:
-          address.phone_no,
-
-        address_line:
-          address.address_line_1,
-
-        city:
-          address.city,
-
-        state:
-          address.state,
-
-        pincode:
-          address.pincode,
-      },
-
-      finance_details: {
-        subtotal,
-
-        discount,
-
-        delivery_charge,
-
-        tax,
-
-        total_amount,
-      },
-
-      payment_details: {
-
-        payment_method,
-
-        payment_status:
-          payment_method === "ONLINE"
-            ? "PENDING"
-            : "PENDING",
-
-        razorpay_order_id,
-
-        razorpay_payment_id: null,
-      },
-
-      order_status:
-        "PENDING",
+      paymentMethod: payment_method,
+      paymentStatus: payment_method === "online" ? "pending" : "pending",
+      subtotal,
+      shippingCharge,
+      totalAmount,
+      orderStatus: "pending",
+      razorpay_order_id,
     });
 
-    // =================================================
-    // 8. CREATE ORDER ITEMS
-    // =================================================
-    const orderItems =
-      cartItems.map((item) => {
+    await Cart.deleteMany({ user: user_id });
 
-        const product =
-          item.product_id;
-
-        return {
-
-          order_id:
-            order._id,
-
-          product_name:
-            product.product_name,
-
-          price:
-            product.price,
-
-          quantity:
-            item.quantity,
-
-          total_price:
-            product.price *
-            item.quantity,
-        };
-      });
-
-    // =================================================
-    // 9. SAVE ORDER ITEMS
-    // =================================================
-    await OrderItem.insertMany(
-      orderItems
-    );
-
-    // =================================================
-    // 10. DELETE CART
-    // =================================================
-    await Cart.deleteMany({
-      user_id,
+    return handleResponse(res, 201, "Order created successfully.", {
+      order,
+      ...(payment_method === "online" && {
+        razorpay: { razorpay_order_id, amount: Math.round(totalAmount * 100), currency: "INR" },
+      }),
     });
-
-    // =================================================
-    // 11. RESPONSE
-    // =================================================
-    return responseHandler(
-      res,
-      201,
-      true,
-      payment_method === "ONLINE"
-        ? "Online order created successfully."
-        : "COD order created successfully.",
-      {
-
-        // Your MongoDB order
-        order,
-
-        // Your MongoDB order items
-        items: orderItems,
-
-        // Razorpay information
-        ...(payment_method === "ONLINE" && {
-          razorpay: {
-            razorpay_order_id,
-            amount:
-              Math.round(
-                total_amount * 100
-              ),
-            currency: "INR",
-          },
-        }),
-      }
-    );
-
   } catch (error) {
-
-    console.error(
-      "Create Order Error:",
-      error
-    );
-
-    return responseHandler(
-      res,
-      500,
-      false,
-      "Internal Server Error",
-      error.message
-    );
+    console.error("Create Order Error:", error);
+    return handleResponse(res, 500, "Internal Server Error");
   }
 };
 
-// =================================================
-// GET ORDER HISTORY
-// =================================================
-// Shows only:
-// Product Name
-// Price
-// Quantity
-// Order Number
-// =================================================
-export const getOrderHistory = async (
-  req,
-  res
-) => {
-
+export const getOrderHistory = async (req, res) => {
   try {
+    const user_id = req.user._id;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
 
-    const user_id =
-      req.user._id;
+    const totalRecords = await Order.countDocuments({ user: user_id });
 
+    const orders = await Order.find({ user: user_id })
+      .select("order_number items totalAmount orderStatus createdAt")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
 
-    const {
-      page,
-      limit,
-      skip,
-    } =
-      getPagination(req);
-
-
-    // ---------------------------------------------
-    // TOTAL ORDERS
-    // ---------------------------------------------
-    const totalRecords =
-      await Order.countDocuments({
-        user_id,
-      });
-
-
-    // ---------------------------------------------
-    // GET ORDERS
-    // ---------------------------------------------
-    const orders =
-      await Order.find({
-        user_id,
-      })
-        .select(
-          "order_number createdAt"
-        )
-        .sort({
-          createdAt: -1,
-        })
-        .skip(skip)
-        .limit(limit)
-        .lean();
-
-
-    // ---------------------------------------------
-    // GET ONLY PRODUCT DETAILS
-    // ---------------------------------------------
-    const ordersWithItems =
-      await Promise.all(
-
-        orders.map(
-          async (order) => {
-
-            const items =
-              await OrderItem.find({
-                order_id:
-                  order._id,
-              })
-                .select(
-                  "product_name price quantity -_id"
-                )
-                .lean();
-
-
-            return {
-
-              order_number:
-                order.order_number,
-
-              createdAt:
-                order.createdAt,
-
-              items,
-
-            };
-
-          }
-        )
-
-      );
-
-
-    return responseHandler(
-      res,
-      200,
-      true,
-      "Orders fetched successfully.",
-      ordersWithItems,
-      {
-        page,
-        limit,
-        totalRecords,
-        totalPages:
-          Math.ceil(
-            totalRecords / limit
-          ),
-      }
-    );
-
-
+    return handleResponse(res, 200, "Orders fetched successfully.", {
+      orders,
+      pagination: { page, limit, totalRecords, totalPages: Math.ceil(totalRecords / limit) },
+    });
   } catch (error) {
-
-    console.error(
-      "Get Order History Error:",
-      error
-    );
-
-    return responseHandler(
-      res,
-      500,
-      false,
-      "Internal Server Error",
-      error.message
-    );
-
+    console.error("Get Order History Error:", error);
+    return handleResponse(res, 500, "Internal Server Error");
   }
-
 };
 
-
-// =================================================
-// GET ORDER BY ID
-// =================================================
-// Complete order information
-// =================================================
-export const getOrderById = async (
-  req,
-  res
-) => {
-
+export const getOrderById = async (req, res) => {
   try {
+    const user_id = req.user._id;
+    const { order_id } = req.params;
 
-    const user_id =
-      req.user._id;
-
-
-    const {
-      order_id,
-    } =
-      req.params;
-
-
-    // ---------------------------------------------
-    // FIND ORDER
-    // ---------------------------------------------
-    const order =
-      await Order.findOne({
-
-        _id:
-          order_id,
-
-        user_id,
-
-      })
-        .populate(
-          "user_id",
-          "first_name last_name email phone_no"
-        )
-        .populate(
-          "address_id"
-        )
-        .lean();
-
-
+    const order = await Order.findOne({ _id: order_id, user: user_id }).lean();
     if (!order) {
-
-      return responseHandler(
-        res,
-        404,
-        false,
-        "Order not found."
-      );
-
+      return handleResponse(res, 404, "Order not found.");
     }
 
-
-    // ---------------------------------------------
-    // GET ORDER ITEMS
-    // ---------------------------------------------
-    const items =
-      await OrderItem.find({
-
-        order_id:
-          order._id,
-
-      })
-        .select(
-          "product_name price quantity total_price -_id"
-        )
-        .lean();
-
-
-    return responseHandler(
-      res,
-      200,
-      true,
-      "Order fetched successfully.",
-      {
-
-        ...order,
-
-        items,
-
-      }
-    );
-
-
+    return handleResponse(res, 200, "Order fetched successfully.", order);
   } catch (error) {
-
-    console.error(
-      "Get Order By ID Error:",
-      error
-    );
-
-    return responseHandler(
-      res,
-      500,
-      false,
-      "Internal Server Error",
-      error.message
-    );
-
+    console.error("Get Order By ID Error:", error);
+    return handleResponse(res, 500, "Internal Server Error");
   }
-
 };
 
-
-// =================================================
-// CANCEL ORDER
-// =================================================
-export const cancelOrder = async (
-  req,
-  res
-) => {
-
+export const cancelOrder = async (req, res) => {
   try {
+    const user_id = req.user._id;
+    const { order_id } = req.params;
 
-    const user_id =
-      req.user._id;
-
-
-    const {
-      order_id,
-    } =
-      req.params;
-
-
-    // ---------------------------------------------
-    // FIND ORDER
-    // ---------------------------------------------
-    const order =
-      await Order.findOne({
-
-        _id:
-          order_id,
-
-        user_id,
-
-      });
-
-
+    const order = await Order.findOne({ _id: order_id, user: user_id });
     if (!order) {
-
-      return responseHandler(
-        res,
-        404,
-        false,
-        "Order not found."
-      );
-
+      return handleResponse(res, 404, "Order not found.");
     }
 
-
-    // ---------------------------------------------
-    // CHECK STATUS
-    // ---------------------------------------------
-    const nonCancelableStatuses = [
-
-      "SHIPPED",
-
-      "DELIVERED",
-
-      "CANCELLED",
-
-    ];
-
-
-    if (
-
-      nonCancelableStatuses.includes(
-
-        order.order_status
-
-      )
-
-    ) {
-
-      return responseHandler(
-
-        res,
-
-        400,
-
-        false,
-
-        `Order cannot be cancelled because its status is ${order.order_status}.`
-
-      );
-
+    const nonCancelableStatuses = ["shipped", "delivered", "cancelled"];
+    if (nonCancelableStatuses.includes(order.orderStatus)) {
+      return handleResponse(res, 400, `Order cannot be cancelled because its status is ${order.orderStatus}.`);
     }
 
-
-    // ---------------------------------------------
-    // CANCEL ORDER
-    // ---------------------------------------------
-    order.order_status =
-      "CANCELLED";
-
-
-    // ---------------------------------------------
-    // REFUND PAYMENT
-    // ---------------------------------------------
-    if (
-
-      order.payment_details
-        .payment_status ===
-      "PAID"
-
-    ) {
-
-      order.payment_details
-        .payment_status =
-        "REFUNDED";
-
+    order.orderStatus = "cancelled";
+    if (order.paymentStatus === "paid") {
+      order.paymentStatus = "refunded";
     }
-
-
     await order.save();
 
-
-    return responseHandler(
-
-      res,
-
-      200,
-
-      true,
-
-      "Order cancelled successfully.",
-
-      order
-
-    );
-
-
+    return handleResponse(res, 200, "Order cancelled successfully.", order);
   } catch (error) {
-
-    console.error(
-
-      "Cancel Order Error:",
-
-      error
-
-    );
-
-
-    return responseHandler(
-
-      res,
-
-      500,
-
-      false,
-
-      "Internal Server Error",
-
-      error.message
-
-    );
-
+    console.error("Cancel Order Error:", error);
+    return handleResponse(res, 500, "Internal Server Error");
   }
-
 };

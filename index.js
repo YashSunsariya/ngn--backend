@@ -22,19 +22,24 @@ app.use(cors({
   credentials: true,
 }));
 
-// Parse JSON requests
 app.use(express.json());
-
-// Parse URL-encoded form data
 app.use(express.urlencoded({ extended: true }));
 
-connectDB();
+await connectDB();
 allRoutes(app);
 
 app.get("/", (req, res) => {
   res.send("NGN Project Apis");
-}); 
+});
 
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(err.statusCode || 500).json({
+    statusCode: err.statusCode || 500,
+    message: err.message || "Internal server error",
+    data: null,
+  });
+});
 
 const PORT = process.env.PORT || 3000;
 const HOST= process.env.HOST || "localhost"
